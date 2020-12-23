@@ -21,6 +21,7 @@ static const unsigned char firemode_safe_xbm[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   };
+  
 static const unsigned char firemode_semi_xbm[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -37,6 +38,7 @@ static const unsigned char firemode_semi_xbm[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   };
+
 static const unsigned char firemode_auto_xbm[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -56,21 +58,12 @@ static const unsigned char firemode_auto_xbm[] PROGMEM = {
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
-#define FRAMES_PER_SECOND 15
-
-unsigned int millisBetweenFrames_ms = 1000/FRAMES_PER_SECOND;
-
-unsigned long nextFrame_ms = 0;
-
-
 void drawBbsFired(unsigned long bbsFired) {
   u8g2.setFont(u8g2_font_logisoso30_tn);
 
   String bbsFiredText(bbsFired);
   u8g2_uint_t xOrigin = (127 - (u8g2.getUTF8Width(bbsFiredText.c_str()))) / 2;
   u8g2.drawStr(xOrigin, 36, bbsFiredText.c_str());
-
-  u8g2.sendBuffer();
 }
 
 void drawBatteryVoltage(float batteryVoltage) {
@@ -87,33 +80,41 @@ void drawBatteryVoltage(float batteryVoltage) {
   // u8g2_uint_t batteryFillHeight = (u8g2_uint_t) (tmpBatteryRatio * (float)13);
   // u8g2.setDrawColor(1);
   // u8g2.drawRBox(67,46 + (13 - batteryFillHeight),8,batteryFillHeight,0);
-
-  u8g2.sendBuffer();
 }
 
 void drawSelectorState(uint8_t selectorState) {
   switch (selectorState)
   {
     case 0:
-      Serial.println("Safe");
+      #ifdef DEBUG
+        Serial.println("Safe");
+      #endif
       u8g2.drawXBMP(1, 42, firemodeXBMWidth, firemodeXBMHeight, firemode_safe_xbm);
       break;
     case 1:
-      Serial.println("Semi");
+      #ifdef DEBUG
+        Serial.println("Semi");
+      #endif
       u8g2.drawXBMP(1, 42, firemodeXBMWidth, firemodeXBMHeight, firemode_semi_xbm);
       break;
     case 2:
-      Serial.println("Auto");
+      #ifdef DEBUG
+        Serial.println("Auto");
+      #endif
       u8g2.drawXBMP(1, 42, firemodeXBMWidth, firemodeXBMHeight, firemode_auto_xbm);
       break;
   }
   
-  u8g2.sendBuffer();
 }
+
+#define FRAMES_PER_SECOND 15
+unsigned int millisBetweenFrames_ms = 1000/FRAMES_PER_SECOND;
+unsigned long nextFrame_ms = 0;
 
 void setup(){
   Serial.begin(115200);
-  OpenMosfetEspNowClient::begin(&drawBbsFired, &drawBatteryVoltage, &drawSelectorState);
+  // OpenMosfetEspNowClient::begin(&drawBbsFired, &drawBatteryVoltage, &drawSelectorState);
+  OpenMosfetEspNowClient::begin(NULL, NULL, NULL);
   u8g2.begin();
   u8g2.setBitmapMode(0);
   u8g2.clearBuffer();
@@ -134,4 +135,12 @@ void setup(){
 }
 
 void loop(){
+  if(nextFrame_ms <= millis())
+  {
+    nextFrame_ms = millis() + millisBetweenFrames_ms;
+    drawBbsFired(OpenMosfetEspNowClient::getCurrentBbsFired());
+    drawBatteryVoltage(OpenMosfetEspNowClient::getCurrentBatteryVoltage());
+    drawSelectorState(OpenMosfetEspNowClient::getCurrentSelectorState());
+    u8g2.sendBuffer();
+  }
 }
